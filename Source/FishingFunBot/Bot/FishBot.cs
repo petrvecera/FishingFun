@@ -16,14 +16,11 @@ namespace FishingFun
 
         private ConsoleKey castKey;
         private ConsoleKey rodKey;
-        private ConsoleKey lureKey;
-        private ConsoleKey hsKey;
+        private ConsoleKey lureKey;        
         private List<ConsoleKey> tenMinKey;
         private IBobberFinder bobberFinder;
         private IBiteWatcher biteWatcher;
-        private bool isEnabled;
-        private int maxFinshingMinutes = 45;
-        private int lureTimer = 10;
+        private bool isEnabled;        
         private Stopwatch totalTimeStopWatch = new Stopwatch();
         private Stopwatch stopwatch = new Stopwatch();
         private Stopwatch lureStopwatch = new Stopwatch();
@@ -47,8 +44,7 @@ namespace FishingFun
             this.tenMinKey = tenMinKey;
 
             this.rodKey = ConsoleKey.D2;
-            this.lureKey = ConsoleKey.D3;
-            this.hsKey = ConsoleKey.D9;
+            this.lureKey = ConsoleKey.D3;            
 
             logger.Info("FishBot Created.");
 
@@ -61,98 +57,22 @@ namespace FishingFun
 
             isEnabled = true;
      
-            // Enable total time stopwatch
-            totalTimeStopWatch.Start();
-
-            // Equip the rod
-            WowProcess.PressKey(rodKey);
-
-            // Enable lure stopwatch
-            lureStopwatch.Start();
-            Lure.applyLure(rodKey, lureKey);
 
             while (isEnabled)
             {
-                try
-                {                    
-                    checkLureTimer();
-                    logger.Info($"Pressing key {castKey} to Cast.");
-
-                    FishingEventHandler?.Invoke(this, new FishingEvent { Action = FishingAction.Cast });
-                    WowProcess.PressKey(castKey);
-
-                    Watch(2000);
-
-                    WaitForBite();
-                    checkForStopTimer();
-                }
-                catch (Exception e)
-                {
-                    logger.Error(e.ToString());
-                    Thread.Sleep(2000);
-                }
+                WowProcess.PressKey(ConsoleKey.Spacebar);
+                Thread.Sleep(120000 + random.Next(0, 60000));
             }
 
             logger.Error("Bot has Stopped.");
         }
 
 
-        public void checkForStopTimer()
-        {
-            TimeSpan ts = totalTimeStopWatch.Elapsed;
-            int elapsedMinutes = (int)ts.TotalMinutes;
-
-            logger.Info($"Elapsed {elapsedMinutes} out of {maxFinshingMinutes}mins.");
-
-            if (elapsedMinutes > maxFinshingMinutes)
-            {               
-                Stop();
-                WowProcess.PressKey(hsKey);
-                Thread.Sleep(20000);
-                // Sleep computer
-                SetSuspendState(false, true, true);
-
-            }
-
-
-        }
-
-        public void checkLureTimer()
-        {            
-
-            TimeSpan ts = lureStopwatch.Elapsed;
-            int elapsedMinutes = ts.Minutes;
-            int elapsedSeconds = ts.Seconds;
-            
-            logger.Info($"Checking the lure timer.");
-
-            if ((elapsedMinutes >= lureTimer && elapsedSeconds > 30) || elapsedMinutes > lureTimer)
-            {
-                Lure.applyLure(rodKey, lureKey);
-                lureStopwatch.Restart();
-            } else
-            {
-                logger.Info($"Lure still active for {lureTimer - elapsedMinutes} min");
-            }
-
-
-        }
-
         public void SetCastKey(ConsoleKey castKey)
         {
             this.castKey = castKey;
         }
 
-        private void Watch(int milliseconds)
-        {
-            bobberFinder.Reset();
-            stopwatch.Restart();
-            while (stopwatch.ElapsedMilliseconds < milliseconds)
-            {
-                bobberFinder.Find();
-            }
-            stopwatch.Stop();
-        }
 
         public void Stop()
         {
@@ -161,65 +81,6 @@ namespace FishingFun
             logger.Error("Bot is Stopping...");
         }
 
-        private void WaitForBite()
-        {
-            bobberFinder.Reset();
-
-            var bobberPosition = FindBobber();
-            if (bobberPosition == Point.Empty)
-            {
-                return;
-            }
-
-            this.biteWatcher.Reset(bobberPosition);
-
-            logger.Info("Bobber start position: " + bobberPosition);
-
-            var timedTask = new TimedAction((a) => { logger.Info("Fishing timed out!"); }, 25 * 1000, 25);
-
-            // Wait for the bobber to move
-            while (isEnabled)
-            {
-                var currentBobberPosition = FindBobber();
-                if (currentBobberPosition == Point.Empty || currentBobberPosition.X == 0) { return; }
-
-                if (this.biteWatcher.IsBite(currentBobberPosition))
-                {
-                    Loot(bobberPosition);
-                    PressTenMinKey();
-                    return;
-                }
-
-                if (!timedTask.ExecuteIfDue()) { return; }
-            }
-        }
-
-        private DateTime StartTime = DateTime.Now;
-
-
-        private void PressTenMinKey()
-        {
-            if ((DateTime.Now - StartTime).TotalMinutes > 10 && tenMinKey.Count > 0)
-            {
-                StartTime = DateTime.Now;
-                logger.Info($"Pressing key {tenMinKey} to run a macro.");
-
-                FishingEventHandler?.Invoke(this, new FishingEvent { Action = FishingAction.Cast });
-
-                foreach (var key in tenMinKey)
-                {
-                    WowProcess.PressKey(key);
-                }
-            }
-        }
-
-        private void Loot(Point bobberPosition)
-        {
-            Sleep(900 + random.Next(0, 225));
-            logger.Info($"Right clicking mouse to Loot.");
-            WowProcess.RightClickMouse(logger, bobberPosition);
-            Sleep(1000 + random.Next(0, 125));
-        }
 
         public static void Sleep(int ms)
         {
@@ -250,15 +111,5 @@ namespace FishingFun
             }
         }
 
-        private Point FindBobber()
-        {
-            var timer = new TimedAction((a) => { logger.Info("Waited seconds for target: " + a.ElapsedSecs); }, 1000, 5);
-
-            while (true)
-            {
-                var target = this.bobberFinder.Find();
-                if (target != Point.Empty || !timer.ExecuteIfDue()) { return target; }
-            }
-        }
     }
 }
